@@ -1,4 +1,3 @@
-import axios from 'axios';
 import * as tl from 'azure-pipelines-task-lib/task';
 import { getVariable } from 'azure-pipelines-task-lib/task';
 import * as fs from 'fs';
@@ -8,6 +7,7 @@ import { URL } from 'url';
 import { convertPlaceholder } from '../convertPlaceholder';
 import { ISharedVariables } from '../getSharedVariables';
 import { IDependabotConfig, IDependabotRegistry, IDependabotUpdate } from './interfaces/IDependabotConfig';
+import { AzureDevOpsWebApiClient } from '../azure-devops/AzureDevOpsWebApiClient';
 
 /**
  * Parse the dependabot config YAML file to specify update configuration.
@@ -19,7 +19,7 @@ import { IDependabotConfig, IDependabotRegistry, IDependabotUpdate } from './int
  * @param taskInputs the input variables of the task
  * @returns {IDependabotConfig} config - the dependabot configuration
  */
-export default async function parseConfigFile(taskInputs: ISharedVariables): Promise<IDependabotConfig> {
+export default async function parseConfigFile(taskInputs: ISharedVariables, devOpsClient: AzureDevOpsWebApiClient): Promise<IDependabotConfig> {
   const possibleFilePaths = [
     '/.azuredevops/dependabot.yml',
     '/.azuredevops/dependabot.yaml',
@@ -38,38 +38,10 @@ export default async function parseConfigFile(taskInputs: ISharedVariables): Pro
   if (taskInputs.repositoryOverridden) {
     tl.debug(`Attempting to fetch configuration file via REST API ...`);
     for (const fp of possibleFilePaths) {
-      // make HTTP request
-      var url = `${taskInputs.organizationUrl}${taskInputs.project}/_apis/git/repositories/${taskInputs.repository}/items?path=${fp}`;
-      tl.debug(`GET ${url}`);
-
-      try {
-        var response = await axios.get(url, {
-          auth: {
-            username: 'x-access-token',
-            password: taskInputs.systemAccessToken,
-          },
-          headers: {
-            Accept: '*/*', // Gotcha!!! without this SH*T fails terribly
-          },
-        });
-        if (response.status === 200) {
-          tl.debug(`Found configuration file at '${url}'`);
-          contents = response.data;
-          break;
-        }
-      } catch (error) {
-        var responseStatusCode = error?.response?.status;
-
-        if (responseStatusCode === 404) {
-          tl.debug(`No configuration file at '${url}'`);
-          continue;
-        } else if (responseStatusCode === 401) {
-          throw new Error(`No access token has been provided to access '${url}'`);
-        } else if (responseStatusCode === 403) {
-          throw new Error(`The access token provided does not have permissions to access '${url}'`);
-        } else {
-          throw error;
-        }
+      contents = await devOpsClient.getRepositoryFileContents(taskInputs.projectName, taskInputs.repository, fp);
+      if (contents) {
+        tl.debug(`Found configuration file at '${fp}'`);
+        break;
       }
     }
   } else {

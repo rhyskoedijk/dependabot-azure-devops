@@ -1,3 +1,4 @@
+import { RestClient } from 'typed-rest-client/RestClient';
 import { WebApi, getPersonalAccessTokenHandler } from 'azure-devops-node-api';
 import {
   CommentThreadStatus,
@@ -68,6 +69,41 @@ export class AzureDevOpsWebApiClient {
       return repo.defaultBranch;
     } catch (e) {
       error(`Failed to get default branch for '${project}/${repository}': ${e}`);
+      console.debug(e); // Dump the error stack trace to help with debugging
+      return undefined;
+    }
+  }
+
+  /**
+   * Get the contents of a file in a repository
+   * @param project
+   * @param repository
+   * @param creator
+   * @returns
+   */
+  public async getRepositoryFileContents(
+    project: string,
+    repository: string,
+    filePath: string,
+  ): Promise<string | undefined> {
+    try {
+
+      // Find the item in the repository
+      const git = await this.connection.getGitApi();
+      const items = await git.getItems(repository, project, filePath);
+      if (items.length > 1) {
+        throw new Error(`Multiple items found for path '${filePath}' in repository '${project}/${repository}'`);
+      }
+      if (items.length === 0) {
+        return undefined;
+      }
+
+      // Get the file contents
+      const response = await this.connection.rest.client.get(items[0].url);
+      return await response.readBody();
+
+    } catch (e) {
+      error(`Failed to get file contents from repository: ${e}`);
       console.debug(e); // Dump the error stack trace to help with debugging
       return undefined;
     }
@@ -518,6 +554,35 @@ export class AzureDevOpsWebApiClient {
     } catch (e) {
       error(`Failed to update project property '${name}': ${e}`);
       console.debug(e); // Dump the error stack trace to help with debugging
+    }
+  }
+
+  /**
+   * Make a REST API request to the DevOps API.
+   * This is used for operations that are not yet supported by the node/typed API.
+   * @param url
+   * @param data
+   * @returns
+   */
+  private async restApiRequest(url: string, data?: any): Promise<any | undefined> {
+    try {
+      var response = data 
+        ? await this.connection.rest.client.post(url, JSON.stringify(data), { 'Content-Type': 'application/json' })
+        : await this.connection.rest.client.get(url, { 'Accept': 'application/json' });
+      if (response.message.statusCode === 200) {
+        return JSON.parse(await response.readBody());
+      }
+    } catch (error) {
+      var responseStatusCode = error?.response?.statusCode;
+      if (responseStatusCode === 404) {
+        return undefined;
+      } else if (responseStatusCode === 401) {
+        throw new Error(`No access token has been provided to access '${url}'`);
+      } else if (responseStatusCode === 403) {
+        throw new Error(`The access token provided does not have permissions to access '${url}'`);
+      } else {
+        throw error;
+      }
     }
   }
 }
