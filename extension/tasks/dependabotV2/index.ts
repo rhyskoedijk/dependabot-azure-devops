@@ -27,12 +27,6 @@ async function run() {
       throw new Error('Failed to parse task input configuration');
     }
 
-    // Parse dependabot.yaml configuration file
-    const dependabotConfig = await parseDependabotConfigFile(taskInputs);
-    if (!dependabotConfig) {
-      throw new Error('Failed to parse dependabot.yaml configuration file from the target repository');
-    }
-
     // Initialise the DevOps API clients
     // There are two clients; one for authoring pull requests and one for auto-approving pull requests (if configured)
     const prAuthorClient = new AzureDevOpsWebApiClient(
@@ -66,6 +60,12 @@ async function run() {
       proxyImage: undefined, // TODO: Add config for this?
       updaterImage: undefined, // TODO: Add config for this?
     };
+
+    // Parse dependabot.yaml configuration file
+    const dependabotConfig = await parseDependabotConfigFile(taskInputs, prAuthorClient);
+    if (!dependabotConfig) {
+      throw new Error('Failed to parse dependabot.yaml configuration file from the target repository');
+    }
 
     // If update identifiers are specified, select them; otherwise handle all
     let updates: IDependabotUpdate[] = [];
