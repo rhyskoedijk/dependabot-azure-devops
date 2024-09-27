@@ -21,12 +21,14 @@ export class AzureDevOpsWebApiClient {
   private readonly organisationApiUrl: string;
   private readonly accessToken: string;
   private readonly connection: WebApi;
+  private cachedSecurityNamespaces: any;
   private cachedUserIds: Record<string, string>;
 
   constructor(organisationApiUrl: string, accessToken: string) {
     this.organisationApiUrl = organisationApiUrl;
     this.accessToken = accessToken;
     this.connection = new WebApi(organisationApiUrl, getPersonalAccessTokenHandler(accessToken));
+    this.cachedSecurityNamespaces = undefined;
     this.cachedUserIds = {};
   }
 
@@ -554,6 +556,55 @@ export class AzureDevOpsWebApiClient {
     } catch (e) {
       error(`Failed to update project property '${name}': ${e}`);
       console.debug(e); // Dump the error stack trace to help with debugging
+    }
+  }
+
+  /**
+   * Check if the authenticated user has the requested permissions, throws error if any are missing
+   * @param securityNamespacePermissions
+   */
+  public async assertUserPermissions(securityNamespacePermissions: Record<string, { token: string, actions: string[] }>): Promise<void> {
+
+    // Get and cache the security namespaces for the organisation
+    this.cachedSecurityNamespaces ||= (await this.restApiRequest(
+      `${this.organisationApiUrl}/_apis/securitynamespaces?api-version=7.1`
+    ))?.value;
+
+    // Convert the requested permissions into a list of permission evaluations
+    const permissionEvaluations = [];
+    for (const namespace of this.cachedSecurityNamespaces) {
+      const requestedNamespacePermission = securityNamespacePermissions[namespace.name];
+      if (!requestedNamespacePermission) {
+        continue;
+      }
+      const requestedActions = namespace.actions.filter((a) => requestedNamespacePermission.actions.includes(a.name));
+      permissionEvaluations.push(
+        {
+          securityNamespaceId: namespace.namespaceId,
+          token: requestedNamespacePermission.token,
+          permissions: requestedActions.reduce((p, a) => p | a.bit, 0),
+        }
+      );
+    }
+
+    // Evaluate the permissions
+    const evaluatedPermissions = await this.restApiRequest(
+      `${this.organisationApiUrl}/_apis/security/permissionevaluationbatch?api-version=7.1`,
+      {
+        alwaysAllowAdministrators: false,
+        evaluations: permissionEvaluations,
+      }
+    );
+
+    // If any permissions are missing, log and throw an error
+    const missingPermissions = evaluatedPermissions.evaluations?.filter((e) => !e.value);
+    if (missingPermissions.length > 0) {
+      const userId = await this.getUserId();
+      for (const missingPermission of missingPermissions) {
+        const namespace = this.cachedSecurityNamespaces?.find((n) => n.namespaceId === missingPermission.securityNamespaceId)?.name;
+        error(`User '${userId}' requires permission to ${namespace?.toLowerCase()} "${missingPermission.role}" with action(s) ${JSON.stringify(securityNamespacePermissions[namespace])}.`);
+      }
+      throw new Error(`User '${userId}' does not have required permissions to complete this task. Review the errors above for more information.`);
     }
   }
 
