@@ -40,6 +40,10 @@ async function run() {
         )
       : null;
 
+    // Check that our authenticated user(s) have the permissions required to perform this update.
+    // Historically, permissions have been the cause of many reported issues; Ideally we want to catch these problems early and give clear instructions on what is missing.
+    //await assertAllRequiredPermissionsAreAssignedFor(taskInputs, prAuthorClient, prApproverClient);
+
     // Fetch the active pull requests created by the author user
     const prAuthorActivePullRequests = await prAuthorClient.getActivePullRequestProperties(
       taskInputs.project,
@@ -146,6 +150,53 @@ async function run() {
     exception(e);
   } finally {
     dependabot?.cleanup();
+  }
+}
+
+async function assertAllRequiredPermissionsAreAssignedFor(
+  taskInputs: any,
+  prAuthorClient: AzureDevOpsWebApiClient,
+  prApproverClient: AzureDevOpsWebApiClient,
+) {
+  const projectScopeToken = `$PROJECT:vstfs:///Classification/TeamProject/${taskInputs.projectId}/`;
+  const repositoryScopeToken = `repoV2/${taskInputs.projectId}/`; // TODO: Add repository id
+
+  // We always need permission to read the target repository, to read files
+  await prAuthorClient.assertUserPermissions({
+    'Git Repositories': {
+      token: repositoryScopeToken,
+      actions: ['GenericRead'],
+    },
+  });
+
+  // Check permission to create/update pull requests
+  if (!taskInputs.skipPullRequests) {
+    await prAuthorClient.assertUserPermissions({
+      'Git Repositories': {
+        token: repositoryScopeToken,
+        actions: ['GenericContribute', 'CreateBranch', 'ForcePush'],
+      },
+    });
+  }
+
+  // Check permission to auto-approve pull requests
+  if (taskInputs.autoApprove && prApproverClient) {
+    await prApproverClient?.assertUserPermissions({
+      'Git Repositories': {
+        token: repositoryScopeToken,
+        actions: ['PullRequestContribute'],
+      },
+    });
+  }
+
+  // Check permission to read/store the project dependency list snapshots
+  if (taskInputs.storeDependencyList) {
+    await prAuthorClient.assertUserPermissions({
+      Project: {
+        token: projectScopeToken,
+        actions: ['GENERIC_READ', 'GENERIC_WRITE'],
+      },
+    });
   }
 }
 
