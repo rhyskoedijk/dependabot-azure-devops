@@ -1,4 +1,3 @@
-import { RestClient } from 'typed-rest-client/RestClient';
 import { WebApi, getPersonalAccessTokenHandler } from 'azure-devops-node-api';
 import {
   CommentThreadStatus,
@@ -89,7 +88,6 @@ export class AzureDevOpsWebApiClient {
     filePath: string,
   ): Promise<string | undefined> {
     try {
-
       // Find the item in the repository
       const git = await this.connection.getGitApi();
       const items = await git.getItems(repository, project, filePath);
@@ -103,7 +101,6 @@ export class AzureDevOpsWebApiClient {
       // Get the file contents
       const response = await this.connection.rest.client.get(items[0].url);
       return await response.readBody();
-
     } catch (e) {
       error(`Failed to get file contents from repository: ${e}`);
       console.debug(e); // Dump the error stack trace to help with debugging
@@ -563,12 +560,13 @@ export class AzureDevOpsWebApiClient {
    * Check if the authenticated user has the requested permissions, throws error if any are missing
    * @param securityNamespacePermissions
    */
-  public async assertUserPermissions(securityNamespacePermissions: Record<string, { token: string, actions: string[] }>): Promise<void> {
-
+  public async assertUserPermissions(
+    securityNamespacePermissions: Record<string, { token: string; actions: string[] }>,
+  ): Promise<void> {
     // Get and cache the security namespaces for the organisation
-    this.cachedSecurityNamespaces ||= (await this.restApiRequest(
-      `${this.organisationApiUrl}/_apis/securitynamespaces?api-version=7.1`
-    ))?.value;
+    this.cachedSecurityNamespaces ||= (
+      await this.restApiRequest(`${this.organisationApiUrl}/_apis/securitynamespaces?api-version=7.1`)
+    )?.value;
 
     // Convert the requested permissions into a list of permission evaluations
     const permissionEvaluations = [];
@@ -578,13 +576,11 @@ export class AzureDevOpsWebApiClient {
         continue;
       }
       const requestedActions = namespace.actions.filter((a) => requestedNamespacePermission.actions.includes(a.name));
-      permissionEvaluations.push(
-        {
-          securityNamespaceId: namespace.namespaceId,
-          token: requestedNamespacePermission.token,
-          permissions: requestedActions.reduce((p, a) => p | a.bit, 0),
-        }
-      );
+      permissionEvaluations.push({
+        securityNamespaceId: namespace.namespaceId,
+        token: requestedNamespacePermission.token,
+        permissions: requestedActions.reduce((p, a) => p | a.bit, 0),
+      });
     }
 
     // Evaluate the permissions
@@ -593,7 +589,7 @@ export class AzureDevOpsWebApiClient {
       {
         alwaysAllowAdministrators: false,
         evaluations: permissionEvaluations,
-      }
+      },
     );
 
     // If any permissions are missing, log and throw an error
@@ -601,10 +597,16 @@ export class AzureDevOpsWebApiClient {
     if (missingPermissions.length > 0) {
       const userId = await this.getUserId();
       for (const missingPermission of missingPermissions) {
-        const namespace = this.cachedSecurityNamespaces?.find((n) => n.namespaceId === missingPermission.securityNamespaceId)?.name;
-        error(`User '${userId}' requires permission to ${namespace?.toLowerCase()} "${missingPermission.role}" with action(s) ${JSON.stringify(securityNamespacePermissions[namespace])}.`);
+        const namespace = this.cachedSecurityNamespaces?.find(
+          (n) => n.namespaceId === missingPermission.securityNamespaceId,
+        )?.name;
+        error(
+          `User '${userId}' requires permission to ${namespace?.toLowerCase()} "${missingPermission.role}" with action(s) ${JSON.stringify(securityNamespacePermissions[namespace])}.`,
+        );
       }
-      throw new Error(`User '${userId}' does not have required permissions to complete this task. Review the errors above for more information.`);
+      throw new Error(
+        `User '${userId}' does not have required permissions to complete this task. Review the errors above for more information.`,
+      );
     }
   }
 
@@ -617,9 +619,9 @@ export class AzureDevOpsWebApiClient {
    */
   private async restApiRequest(url: string, data?: any): Promise<any | undefined> {
     try {
-      var response = data 
+      var response = data
         ? await this.connection.rest.client.post(url, JSON.stringify(data), { 'Content-Type': 'application/json' })
-        : await this.connection.rest.client.get(url, { 'Accept': 'application/json' });
+        : await this.connection.rest.client.get(url, { Accept: 'application/json' });
       if (response.message.statusCode === 200) {
         return JSON.parse(await response.readBody());
       }

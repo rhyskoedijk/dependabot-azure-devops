@@ -4,10 +4,10 @@ import * as fs from 'fs';
 import { load } from 'js-yaml';
 import * as path from 'path';
 import { URL } from 'url';
+import { AzureDevOpsWebApiClient } from '../azure-devops/AzureDevOpsWebApiClient';
 import { convertPlaceholder } from '../convertPlaceholder';
 import { ISharedVariables } from '../getSharedVariables';
 import { IDependabotConfig, IDependabotRegistry, IDependabotUpdate } from './interfaces/IDependabotConfig';
-import { AzureDevOpsWebApiClient } from '../azure-devops/AzureDevOpsWebApiClient';
 
 /**
  * Parse the dependabot config YAML file to specify update configuration.
@@ -19,7 +19,10 @@ import { AzureDevOpsWebApiClient } from '../azure-devops/AzureDevOpsWebApiClient
  * @param taskInputs the input variables of the task
  * @returns {IDependabotConfig} config - the dependabot configuration
  */
-export default async function parseConfigFile(taskInputs: ISharedVariables, devOpsClient: AzureDevOpsWebApiClient): Promise<IDependabotConfig> {
+export default async function parseConfigFile(
+  taskInputs: ISharedVariables,
+  devOpsClient: AzureDevOpsWebApiClient,
+): Promise<IDependabotConfig> {
   const possibleFilePaths = [
     '/.azuredevops/dependabot.yml',
     '/.azuredevops/dependabot.yaml',
