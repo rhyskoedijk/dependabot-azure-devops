@@ -26,7 +26,7 @@ export class DependabotJobBuilder {
     id: string,
     update: IDependabotUpdate,
     registries: Record<string, IDependabotRegistry>,
-    dependencyList: any[],
+    dependencyList: any[] | undefined,
     existingPullRequests: any[],
   ): IDependabotUpdateOperation {
     const packageEcosystem = update['package-ecosystem'];
@@ -137,7 +137,7 @@ function buildUpdateJobConfig(
   };
 }
 
-function mapDependenciesForSecurityUpdate(dependencyList: any[]): string[] {
+function mapDependenciesForSecurityUpdate(dependencyList: any[] | undefined): string[] {
   if (!dependencyList || dependencyList.length == 0) {
     // This happens when no previous dependency list snapshot exists yet;
     // TODO: Find a way to discover dependencies for a first-time security-only update (no existing dependency list snapshot).

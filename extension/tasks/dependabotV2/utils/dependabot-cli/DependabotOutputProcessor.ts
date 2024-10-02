@@ -1,8 +1,8 @@
 import { GitPullRequestMergeStrategy, VersionControlChangeType } from 'azure-devops-node-api/interfaces/GitInterfaces';
 import { command, error, warning } from 'azure-pipelines-task-lib/task';
 import * as crypto from 'crypto';
-import * as path from 'path';
 import * as fs from 'fs';
+import * as path from 'path';
 import { AzureDevOpsWebApiClient } from '../azure-devops/AzureDevOpsWebApiClient';
 import { IPullRequestProperties } from '../azure-devops/interfaces/IPullRequestProperties';
 import { ISharedVariables } from '../getSharedVariables';
@@ -58,7 +58,7 @@ export class DependabotOutputProcessor implements IDependabotUpdateOutputProcess
       // See: https://github.com/dependabot/cli/blob/main/internal/model/update.go
 
       case 'update_dependency_list':
-        // Store the dependency list snapshot in project properties, if configured and we're not updating a pull request
+        // Upload the dependency list snapshot to the pipeline artifacts, if configured and we're NOT updating a pull request
         if (this.taskInputs.storeDependencyList && update.job['updating-a-pull-request'] === false) {
           const artifactName = `${update.job.id}-dependency-list.json`;
           const artifactPath = path.join(process.cwd(), artifactName);
@@ -74,35 +74,15 @@ export class DependabotOutputProcessor implements IDependabotUpdateOutputProcess
           };
 
           console.info(`Uploading the dependency list snapshot to pipeline artifacts...`);
-          fs.writeFileSync(artifactPath, JSON.stringify(data, null, 2));
+          fs.writeFileSync(artifactPath, JSON.stringify(artifactData, null, 2));
           command(
             'artifact.upload',
             {
               containerfolder: 'dependabot',
-              artifactname: artifactName
+              artifactname: 'dependency-snapshots',
             },
             artifactPath,
           );
-
-          /*
-          console.info(`Storing the dependency list snapshot for project '${project}'...`);
-          await this.prAuthorClient.updateProjectProperty(
-            this.taskInputs.projectId,
-            DependabotOutputProcessor.PROJECT_PROPERTY_NAME_DEPENDENCY_LIST,
-            function (existingValue: string) {
-              const repoDependencyLists = JSON.parse(existingValue || '{}');
-              repoDependencyLists[repository] = repoDependencyLists[repository] || {};
-              repoDependencyLists[repository][update.job['package-manager']] = {
-                'dependencies': data['dependencies'],
-                'dependency-files': data['dependency_files'],
-                'last-updated': new Date().toISOString(),
-              };
-
-              return JSON.stringify(repoDependencyLists);
-            },
-          );
-          console.info(`Dependency list snapshot was updated for project '${project}'`);
-          */
         }
 
         return true;
