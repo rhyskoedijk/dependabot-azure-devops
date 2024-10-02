@@ -18,10 +18,6 @@ export class DependabotOutputProcessor implements IDependabotUpdateOutputProcess
   private readonly existingPullRequests: IPullRequestProperties[];
   private readonly taskInputs: ISharedVariables;
 
-  // Custom properties used to store dependabot metadata in projects.
-  // https://learn.microsoft.com/en-us/rest/api/azure/devops/core/projects/set-project-properties
-  public static PROJECT_PROPERTY_NAME_DEPENDENCY_LIST = 'Dependabot.DependencyList';
-
   // Custom properties used to store dependabot metadata in pull requests.
   // https://learn.microsoft.com/en-us/rest/api/azure/devops/git/pull-request-properties
   public static PR_PROPERTY_NAME_PACKAGE_MANAGER = 'Dependabot.PackageManager';
@@ -287,21 +283,6 @@ export function buildPullRequestProperties(packageManager: string, dependencies:
       value: JSON.stringify(dependencies),
     },
   ];
-}
-
-export function parseProjectDependencyListProperty(
-  properties: Record<string, string>,
-  repository: string,
-  packageManager: string,
-): any {
-  try {
-    const dependencyList = properties?.[DependabotOutputProcessor.PROJECT_PROPERTY_NAME_DEPENDENCY_LIST] || '{}';
-    const repoDependencyLists = JSON.parse(dependencyList);
-    return repoDependencyLists[repository]?.[packageManager];
-  } catch (e) {
-    error(`Failed to parse project dependency list property: ${e}`);
-    return {};
-  }
 }
 
 export function parsePullRequestProperties(
