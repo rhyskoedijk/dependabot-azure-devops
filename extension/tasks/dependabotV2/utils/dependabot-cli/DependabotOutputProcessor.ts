@@ -1,7 +1,8 @@
 import { GitPullRequestMergeStrategy, VersionControlChangeType } from 'azure-devops-node-api/interfaces/GitInterfaces';
-import { error, warning } from 'azure-pipelines-task-lib/task';
+import { command, error, warning } from 'azure-pipelines-task-lib/task';
 import * as crypto from 'crypto';
 import * as path from 'path';
+import * as fs from 'fs';
 import { AzureDevOpsWebApiClient } from '../azure-devops/AzureDevOpsWebApiClient';
 import { IPullRequestProperties } from '../azure-devops/interfaces/IPullRequestProperties';
 import { ISharedVariables } from '../getSharedVariables';
@@ -57,8 +58,33 @@ export class DependabotOutputProcessor implements IDependabotUpdateOutputProcess
       // See: https://github.com/dependabot/cli/blob/main/internal/model/update.go
 
       case 'update_dependency_list':
-        // Store the dependency list snapshot in project properties, if configured
-        if (this.taskInputs.storeDependencyList) {
+        // Store the dependency list snapshot in project properties, if configured and we're not updating a pull request
+        if (this.taskInputs.storeDependencyList && update.job['updating-a-pull-request'] === false) {
+          const artifactName = `${update.job.id}-dependency-list.json`;
+          const artifactPath = path.join(process.cwd(), artifactName);
+          const artifactData = {
+            'version': 2,
+            'project': project,
+            'repository': repository,
+            'commit': data['base-commit-sha'] || update.job.source.commit,
+            'dependencies': data['dependencies'],
+            'dependency-files': data['dependency_files'],
+            'security-advisories': update.job['security-advisories'],
+            'timestamp': new Date().toISOString(),
+          };
+
+          console.info(`Uploading the dependency list snapshot to pipeline artifacts...`);
+          fs.writeFileSync(artifactPath, JSON.stringify(data, null, 2));
+          command(
+            'artifact.upload',
+            {
+              containerfolder: 'dependabot',
+              artifactname: artifactName
+            },
+            artifactPath,
+          );
+
+          /*
           console.info(`Storing the dependency list snapshot for project '${project}'...`);
           await this.prAuthorClient.updateProjectProperty(
             this.taskInputs.projectId,
@@ -76,6 +102,7 @@ export class DependabotOutputProcessor implements IDependabotUpdateOutputProcess
             },
           );
           console.info(`Dependency list snapshot was updated for project '${project}'`);
+          */
         }
 
         return true;
@@ -287,9 +314,14 @@ export function parseProjectDependencyListProperty(
   repository: string,
   packageManager: string,
 ): any {
-  const dependencyList = properties?.[DependabotOutputProcessor.PROJECT_PROPERTY_NAME_DEPENDENCY_LIST] || '{}';
-  const repoDependencyLists = JSON.parse(dependencyList);
-  return repoDependencyLists[repository]?.[packageManager];
+  try {
+    const dependencyList = properties?.[DependabotOutputProcessor.PROJECT_PROPERTY_NAME_DEPENDENCY_LIST] || '{}';
+    const repoDependencyLists = JSON.parse(dependencyList);
+    return repoDependencyLists[repository]?.[packageManager];
+  } catch (e) {
+    error(`Failed to parse project dependency list property: ${e}`);
+    return {};
+  }
 }
 
 export function parsePullRequestProperties(

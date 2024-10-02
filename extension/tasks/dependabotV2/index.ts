@@ -82,7 +82,7 @@ async function run() {
 
     // Loop through the [targeted] update blocks in dependabot.yaml and perform updates
     for (const update of updates) {
-      const updateId = updates.indexOf(update).toString();
+      const updateId = dependabotConfig.updates.indexOf(update).toString();
 
       // Parse the last dependency list snapshot (if any) from the project properties.
       // This is required when doing a security-only update as dependabot requires the list of vulnerable dependencies to be updated.
