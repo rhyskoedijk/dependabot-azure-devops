@@ -16,11 +16,6 @@
     "icons": {
         "default": "logo.png"
     },
-    "content": {
-        "details": {
-            "path": "overview.md"
-        }
-    },
     "files": [
         {
             "path": "static",

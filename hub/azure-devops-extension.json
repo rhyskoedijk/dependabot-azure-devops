@@ -2,7 +2,7 @@
     "manifestVersion": 1,
     "id": "samples",
     "publisher": "rhyskoedijk",
-    "version": "1.0.475",
+    "version": "1.0.479",
     "name": "Extension Sample",
     "description": "Azure DevOps extension sample",
     "categories": [
@@ -15,11 +15,6 @@
     ],
     "icons": {
         "default": "logo.png"
-    },
-    "content": {
-        "details": {
-            "path": "overview.md"
-        }
     },
     "files": [
         {
