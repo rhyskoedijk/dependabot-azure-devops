@@ -1,0 +1,19 @@
+{
+    "contributions": [
+        {
+            "id": "dependabot-code-hub",
+            "type": "ms.vss-web.hub",
+            "targets": [
+                "ms.vss-code-web.code-hub-group"
+            ],
+            "properties": {
+                "name": "Dependabot",
+                "uri": "dist/dependabot/dependabot.html",
+                "icon": {
+                    "light": "static/dependabot.png",
+                    "dark": "static/dependabot.png"
+                }
+            }
+        }
+    ] 
+}
