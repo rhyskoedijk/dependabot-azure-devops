@@ -224,7 +224,7 @@ function setSecrets(...args: any[]) {
   for (const arg of args) {
     const secretParts = arg?.split(' ') || [];
     for (const secret of secretParts) {
-      if (secret?.toLower() !== 'dependabot') {
+      if (secret !== 'dependabot') {
         setSecret(secret);
       }
     }
