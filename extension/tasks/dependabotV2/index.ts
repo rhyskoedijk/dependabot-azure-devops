@@ -1,4 +1,4 @@
-import { debug, error, setResult, TaskResult, warning, which } from 'azure-pipelines-task-lib/task';
+import { debug, error, setResult, setSecret, TaskResult, warning, which } from 'azure-pipelines-task-lib/task';
 import { AzureDevOpsWebApiClient } from './utils/azure-devops/AzureDevOpsWebApiClient';
 import { DependabotCli } from './utils/dependabot-cli/DependabotCli';
 import { DependabotJobBuilder } from './utils/dependabot-cli/DependabotJobBuilder';
@@ -10,7 +10,7 @@ import { IDependabotUpdateOperationResult } from './utils/dependabot-cli/interfa
 import { IDependabotUpdate } from './utils/dependabot/interfaces/IDependabotConfig';
 import parseDependabotConfigFile from './utils/dependabot/parseConfigFile';
 import parseTaskInputConfiguration from './utils/getSharedVariables';
-import { getSecurityAdvisories, ISecurityAdvisory } from './utils/github/getSecurityAdvisories';
+import { ISecurityAdvisory } from './utils/github/getSecurityAdvisories';
 
 async function run() {
   let dependabot: DependabotCli = undefined;
@@ -27,6 +27,24 @@ async function run() {
     if (!taskInputs) {
       throw new Error('Failed to parse task input configuration');
     }
+
+    // Mask environment, organisation, and project specific variables from the logs.
+    // Most user's environments are private and they're less likely to share diagnostic info when it exposes information about their environment or organisation.
+    // Although not exhaustive, this will mask the most common information that could be used to identify the user's environment.
+    setSecrets(
+      taskInputs.hostname,
+      taskInputs.virtualDirectory,
+      taskInputs.organization,
+      taskInputs.projectId,
+      taskInputs.project,
+      taskInputs.repository,
+      taskInputs.githubAccessToken,
+      taskInputs.systemAccessUser,
+      taskInputs.systemAccessToken,
+      taskInputs.authorEmail,
+      taskInputs.authorName,
+      taskInputs.autoApproveUserToken,
+    );
 
     // Parse dependabot.yaml configuration file
     const dependabotConfig = await parseDependabotConfigFile(taskInputs);
@@ -105,7 +123,7 @@ async function run() {
       if (securityUpdatesOnly) {
         // TODO: If and when Dependabot supports a better way to do security-only updates, we should remove this code block.
         warning(
-          'Security-only updates are only partially supported by Dependabot CLI. For more info, see: https://github.com/tinglesoftware/dependabot-azure-devops/blob/main/docs/migrations/v1-to-v2.md#security-only-updates'
+          'Security-only updates are only partially supported by Dependabot CLI. For more info, see: https://github.com/tinglesoftware/dependabot-azure-devops/blob/main/docs/migrations/v1-to-v2.md#security-only-updates',
         );
         warning(
           'To work around the limitations of Dependabot CLI, vulnerable dependencies will be discovered using an "ignore everything" regular update job. ' +
@@ -200,6 +218,15 @@ function handleUpdateOperationResults(outputs: IDependabotUpdateOperationResult[
   }
 
   return failedTasks;
+}
+
+function setSecrets(...args: any[]) {
+  for (const arg of args) {
+    const secretParts = arg?.split(' ') || [];
+    for (const secret of secretParts) {
+      setSecret(secret);
+    }
+  }
 }
 
 function exception(e: Error) {
