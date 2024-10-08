@@ -53,7 +53,7 @@ export class DependabotCli {
     },
   ): Promise<IDependabotUpdateOperationResult[] | undefined> {
     try {
-      group(`Dependabot update job '${operation.job.id}'`);
+      group(`Job '${operation.job.id}'`);
 
       // Find the dependabot tool path, or install it if missing
       const dependabotPath = await this.getDependabotToolPath();
@@ -102,7 +102,7 @@ export class DependabotCli {
 
       // Run dependabot update
       if (!fs.existsSync(jobOutputPath) || fs.statSync(jobOutputPath)?.size == 0) {
-        section(`Processing Dependabot update job '${jobInputPath}'`);
+        section(`Processing job from '${jobInputPath}'`);
         const dependabotTool = tool(dependabotPath).arg(dependabotArguments);
         const dependabotResultCode = await dependabotTool.execAsync({
           failOnStdErr: false,
@@ -132,7 +132,7 @@ export class DependabotCli {
       if (fs.existsSync(jobOutputPath)) {
         const jobOutputs = readJobScenarioOutputFile(jobOutputPath);
         if (jobOutputs?.length > 0) {
-          section(`Processing Dependabot job outputs '${jobOutputPath}'`);
+          section(`Processing job outputs from '${jobOutputPath}'`);
           for (const output of jobOutputs) {
             // Documentation on the scenario model can be found here:
             // https://github.com/dependabot/cli/blob/main/internal/model/scenario.go
