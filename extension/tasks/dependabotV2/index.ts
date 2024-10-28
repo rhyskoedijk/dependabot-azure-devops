@@ -9,6 +9,7 @@ import {
   parsePullRequestProperties,
 } from './utils/dependabot-cli/DependabotOutputProcessor';
 import { IDependabotUpdateOperationResult } from './utils/dependabot-cli/interfaces/IDependabotUpdateOperationResult';
+import { convertPackageEcosystemToPackageManager } from './utils/dependabot/convertPackageEcosystemToPackageManager';
 import { IDependabotUpdate } from './utils/dependabot/interfaces/IDependabotConfig';
 import parseDependabotConfigFile from './utils/dependabot/parseConfigFile';
 import parseTaskInputConfiguration from './utils/getSharedVariables';
@@ -74,7 +75,7 @@ async function run() {
 
     // Initialise the Dependabot updater
     dependabot = new DependabotCli(
-      DependabotCli.CLI_IMAGE_LATEST, // TODO: Add config for this?
+      taskInputs.dependabotCliImage,
       new DependabotOutputProcessor(
         taskInputs,
         prAuthorClient,
@@ -90,11 +91,10 @@ async function run() {
       sourceLocalPath: taskInputs.repositorySourcePath,
       azureDevOpsAccessToken: taskInputs.systemAccessToken,
       gitHubAccessToken: taskInputs.githubAccessToken,
-      collectorImage: undefined, // TODO: Add config for this?
-      collectorConfigPath: undefined, // TODO: Add config for this?
-      proxyImage: undefined, // TODO: Add config for this?
-      updaterImage: undefined, // TODO: Add config for this?
-      timeoutDuration: undefined, // TODO: Add config for this?
+      collectorImage: taskInputs.dependabotCollectorImage,
+      collectorConfigPath: taskInputs.dependabotCollectorConfigPath,
+      proxyImage: taskInputs.dependabotProxyImage,
+      updaterImage: taskInputs.dependabotUpdaterImage,
       flamegraph: taskInputs.debug,
     };
 
@@ -112,7 +112,7 @@ async function run() {
     // Loop through the [targeted] update blocks in dependabot.yaml and perform updates
     for (const update of updates) {
       const updateId = updates.indexOf(update).toString();
-      const packageEcosystem = update['package-ecosystem'];
+      const packageManager = convertPackageEcosystemToPackageManager(update['package-ecosystem']);
 
       // Parse the last dependency list snapshot (if any) from the project properties.
       // This is required when doing a security-only update as dependabot requires the list of vulnerable dependencies to be updated.
@@ -120,15 +120,12 @@ async function run() {
       const dependencyList = parseProjectDependencyListProperty(
         await prAuthorClient.getProjectProperties(taskInputs.projectId),
         taskInputs.repository,
-        packageEcosystem,
+        packageManager,
       );
 
       // Parse the Dependabot metadata for the existing pull requests that are related to this update
       // Dependabot will use this to determine if we need to create new pull requests or update/close existing ones
-      const existingPullRequestsForPackageEcosystem = parsePullRequestProperties(
-        existingPullRequests,
-        packageEcosystem,
-      );
+      const existingPullRequestsForPackageEcosystem = parsePullRequestProperties(existingPullRequests, packageManager);
       const existingPullRequestDependenciesForPackageEcosystem = Object.entries(
         existingPullRequestsForPackageEcosystem,
       ).map(([id, deps]) => deps);

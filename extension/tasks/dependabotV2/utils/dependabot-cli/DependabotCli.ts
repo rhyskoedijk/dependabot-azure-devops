@@ -5,6 +5,7 @@ import * as yaml from 'js-yaml';
 import * as os from 'os';
 import * as path from 'path';
 import { endgroup, group, section } from '../azure-devops/formattingCommands';
+import { convertPackageEcosystemToPackageManager } from '../dependabot/convertPackageEcosystemToPackageManager';
 import { IDependabotUpdateJobConfig } from './interfaces/IDependabotUpdateJobConfig';
 import { IDependabotUpdateOperation } from './interfaces/IDependabotUpdateOperation';
 import { IDependabotUpdateOperationResult } from './interfaces/IDependabotUpdateOperationResult';
@@ -21,7 +22,11 @@ export class DependabotCli {
 
   private toolPath: string;
 
-  public static readonly CLI_IMAGE_LATEST = 'github.com/dependabot/cli/cmd/dependabot@latest';
+  public static readonly CLI_TOOL_LATEST = 'github.com/dependabot/cli/cmd/dependabot@latest';
+  public static readonly COLLECTOR_IMAGE_NAME =
+    'ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib';
+  public static readonly PROXY_IMAGE_NAME = 'ghcr.io/github/dependabot-update-job-proxy/dependabot-update-job-proxy';
+  public static readonly UPDATER_IMAGE_NAME = 'ghcr.io/dependabot/dependabot-updater-{package-ecosystem}';
 
   constructor(cliToolImage: string, outputProcessor: IDependabotUpdateOutputProcessor, debug: boolean) {
     this.jobsPath = path.join(os.tmpdir(), 'dependabot-jobs');
@@ -48,7 +53,6 @@ export class DependabotCli {
       collectorConfigPath?: string;
       proxyImage?: string;
       updaterImage?: string;
-      timeoutDurationMinutes?: number;
       flamegraph?: boolean;
     },
   ): Promise<IDependabotUpdateOperationResult[] | undefined> {
@@ -79,19 +83,29 @@ export class DependabotCli {
         dependabotArguments.push('--local', options.sourceLocalPath);
       }
       if (options?.collectorImage) {
-        dependabotArguments.push('--collector-image', options.collectorImage);
+        dependabotArguments.push(
+          '--collector-image',
+          getDockerImageUrl(options.collectorImage, DependabotCli.COLLECTOR_IMAGE_NAME),
+        );
       }
       if (options?.collectorConfigPath && fs.existsSync(options.collectorConfigPath)) {
         dependabotArguments.push('--collector-config', options.collectorConfigPath);
       }
       if (options?.proxyImage) {
-        dependabotArguments.push('--proxy-image', options.proxyImage);
+        dependabotArguments.push(
+          '--proxy-image',
+          getDockerImageUrl(options.proxyImage, DependabotCli.PROXY_IMAGE_NAME),
+        );
       }
       if (options?.updaterImage) {
-        dependabotArguments.push('--updater-image', options.updaterImage);
-      }
-      if (options?.timeoutDurationMinutes) {
-        dependabotArguments.push('--timeout', `${options.timeoutDurationMinutes}m`);
+        const updaterImageTemplate = getDockerImageUrl(options.updaterImage, DependabotCli.UPDATER_IMAGE_NAME);
+        dependabotArguments.push(
+          '--updater-image',
+          updaterImageTemplate.replace(
+            /\{package-ecosystem\}/i,
+            convertPackageEcosystemToPackageManager(operation.job['package-manager']),
+          ),
+        );
       }
       if (options?.flamegraph) {
         dependabotArguments.push('--flamegraph');
@@ -111,6 +125,8 @@ export class DependabotCli {
             DEPENDABOT_JOB_ID: jobId.replace(/-/g, '_'), // replace hyphens with underscores
             LOCAL_GITHUB_ACCESS_TOKEN: options?.gitHubAccessToken, // avoid rate-limiting when pulling images from GitHub container registries
             LOCAL_AZURE_ACCESS_TOKEN: options?.azureDevOpsAccessToken, // technically not needed since we already supply this in our 'git_source' registry, but included for consistency
+            // TODO: add config for `AZURE_REGISTRY_USERNAME`? Only used by CLI if any of the Docker image url hostnames is `*.azurecr.io`
+            // TODO: add config for `AZURE_REGISTRY_PASSWORD`? Only used by CLI if any of the Docker image url hostnames is `*.azurecr.io`
           },
         });
         if (dependabotResultCode != 0) {
@@ -165,20 +181,23 @@ export class DependabotCli {
   }
 
   // Get the dependabot tool path and install if missing
-  private async getDependabotToolPath(installIfMissing: boolean = true): Promise<string> {
-    debug('Checking for `dependabot` install...');
-    this.toolPath ||= which('dependabot', false);
-    if (this.toolPath) {
-      return this.toolPath;
-    }
-    if (!installIfMissing) {
-      throw new Error('Dependabot CLI install not found');
+  private async getDependabotToolPath(): Promise<string> {
+    // Attempt to find the dependabot tool path, if it is already installed.
+    // If the user has explicitly set the tool image, skip this skip; force install the requested image since the user explicitly asked for it.
+    if (!this.toolImage) {
+      debug('Checking for existing `dependabot` install...');
+      this.toolPath ||= which('dependabot', false);
+      if (this.toolPath) {
+        return this.toolPath;
+      } else {
+        debug('Dependabot install was not found; attempting to install now...');
+      }
     }
 
-    debug('Dependabot CLI install was not found, installing now with `go install dependabot`...');
+    // Install dependabot
     section('Installing Dependabot CLI');
     const goTool: ToolRunner = tool(which('go', true));
-    goTool.arg(['install', this.toolImage]);
+    goTool.arg(['install', this.toolImage || DependabotCli.CLI_TOOL_LATEST]);
     await goTool.execAsync();
 
     // Depending on how Go is configured on the host agent, the "go/bin" path may not be in the PATH environment variable.
@@ -232,4 +251,13 @@ function readJobScenarioOutputFile(path: string): any[] {
   }
 
   return scenario['output'] || [];
+}
+
+function getDockerImageUrl(image: string, defaultImageName: string): string {
+  const isFullyQualifiedUrl = image?.includes('.') && image?.includes('/');
+  if (isFullyQualifiedUrl) {
+    return image;
+  } else {
+    return `${defaultImageName}:${image ?? 'latest'}`;
+  }
 }

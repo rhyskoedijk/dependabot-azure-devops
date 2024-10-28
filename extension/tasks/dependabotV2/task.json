@@ -221,6 +221,22 @@
       "helpMarkDown": "A semicolon (`;`) delimited list of update identifiers run. Index are zero-based and in the order written in the configuration file. When not present, all the updates are run. This is meant to be used in scenarios where you want to run updates a different times from the same configuration file given you cannot schedule them independently in the pipeline."
     },
     {
+      "name": "dependabotCliImage",
+      "type": "string",
+      "groupName": "advanced",
+      "label": "Dependabot CLI image",
+      "required": false,
+      "helpMarkDown": "Override the Dependabot CLI go module location and/or version. When specified, this takes presidence over any pre-installed version of Dependabot on the agent. Defaults to `github.com/dependabot/cli/cmd/dependabot@latest`."
+    },
+    {
+      "name": "dependabotUpdaterImage",
+      "type": "string",
+      "groupName": "advanced",
+      "label": "Dependabot updater image",
+      "required": false,
+      "helpMarkDown": "Override the Dependabot updater image location and/or version. When specified, use `{package-ecosystem}` as a subsistute for the package ecosystem (if required). Defaults to `ghcr.io/dependabot/dependabot-updater-{package-ecosystem}:latest`."
+    },
+    {
       "name": "experiments",
       "type": "string",
       "groupName": "advanced",

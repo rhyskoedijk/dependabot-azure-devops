@@ -1,4 +1,5 @@
 import { warning } from 'azure-pipelines-task-lib';
+import { convertPackageEcosystemToPackageManager } from '../dependabot/convertPackageEcosystemToPackageManager';
 import {
   IDependabotAllowCondition,
   IDependabotGroup,
@@ -92,7 +93,7 @@ function buildUpdateJobConfig(
     config: update,
     job: {
       'id': id,
-      'package-manager': update['package-ecosystem'],
+      'package-manager': convertPackageEcosystemToPackageManager(update['package-ecosystem']),
       'update-subdependencies': true, // TODO: add config for this?
       'updating-a-pull-request': updatingPullRequest,
       'dependency-group-to-refresh': updateDependencyGroupName,

@@ -59,6 +59,13 @@ export interface ISharedVariables {
 
   experiments: Record<string, string | boolean>;
 
+  /** Overrides for dependabot images; useful when "latest" does not work and the user wants to use an earlier well-known working version */
+  dependabotCliImage: string | undefined;
+  dependabotCollectorImage: string | undefined;
+  dependabotCollectorConfigPath: string | undefined;
+  dependabotProxyImage: string | undefined;
+  dependabotUpdaterImage: string | undefined;
+
   /** Determines if verbose log messages are logged */
   debug: boolean;
 
@@ -146,6 +153,12 @@ export default function getSharedVariables(): ISharedVariables {
       {} as Record<string, string | boolean>,
     );
 
+  let dependabotCliImage: string | undefined = tl.getInput('dependabotCliImage', false);
+  let dependabotCollectorImage: string | undefined = tl.getInput('dependabotCollectorImage', false);
+  let dependabotCollectorConfigPath: string | undefined = tl.getInput('dependabotCollectorConfigPath', false);
+  let dependabotProxyImage: string | undefined = tl.getInput('dependabotProxyImage', false);
+  let dependabotUpdaterImage: string | undefined = tl.getInput('dependabotUpdaterImage', false);
+
   let debug: boolean = tl.getVariable('System.Debug')?.match(/true/i) ? true : false;
 
   // Get the target identifiers
@@ -189,6 +202,12 @@ export default function getSharedVariables(): ISharedVariables {
     autoApproveUserToken,
 
     experiments,
+
+    dependabotCliImage,
+    dependabotCollectorImage,
+    dependabotCollectorConfigPath,
+    dependabotProxyImage,
+    dependabotUpdaterImage,
 
     debug,
 
