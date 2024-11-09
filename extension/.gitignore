@@ -1,5 +1,6 @@
+dist
 node_modules
-.taskkey
-**/*.js
+tasks/**/*.js
+*.taskkey
 *.vsix
 *flamegraph.html

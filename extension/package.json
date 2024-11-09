@@ -2,15 +2,20 @@
   "name": "dependabot-azure-devops",
   "version": "2.0.0",
   "description": "Dependabot Azure DevOps task",
-  "main": "''",
   "scripts": {
     "postdependencies": "cp -r node_modules tasks/dependabotV1/node_modules && cp -r node_modules tasks/dependabotV2/node_modules",
-    "build": "tsc -p .",
+    "build": "npm run build:V1 && npm run build:V2",
+    "build:V1": "tsc -p tasks/dependabotV1",
+    "build:V2": "tsc -p tasks/dependabotV2",
+    "test": "npm run test:V1 && npm run test:V2",
+    "test:V1": "jest --testPathPattern=tasks/dependabotV1",
+    "test:V2": "jest --testPathPattern=tasks/dependabotV2",
     "start": "npm run start:V2",
     "start:V1": "node tasks/dependabotV1/index.js",
     "start:V2": "node tasks/dependabotV2/index.js",
-    "test": "jest",
-    "package": "npx tfx-cli extension create --json5"
+    "package": "node vss-extension.version.increment.js && npx tfx-cli extension create --manifests vss-extension.json --output-path dist",
+    "package:dev": "npx tfx-cli extension create --manifests vss-extension.json --output-path dist/dev --overrides-file vss-extension.overrides.dev.json",
+    "package:prod": "npx tfx-cli extension create --manifests vss-extension.json --output-path dist/prod --overrides-file vss-extension.overrides.prod.json"
   },
   "repository": {
     "type": "git",
